@@ -11,6 +11,8 @@ module Facter
         @name = name
 
         @confines = []
+
+        @actions = Graph.new
       end
 
       def clear
@@ -27,8 +29,14 @@ module Facter
         true
       end
 
+      def resolve(name, opts = {}, &block)
+        @actions[name] = Action.new(name, opts[:using], block)
+      end
+
       def value
-        raise NotImplementedError
+        sorted_actions.inject(nil) do |accum, action|
+          action.block.call(accum)
+        end
       end
 
       include Comparable
@@ -41,6 +49,10 @@ module Facter
         @confines.length
       end
 
+      def sorted_actions
+        @actions.tsort.map { |name| @actions[name] }
+      end
+
       # Here at Puppet Labs, we fully endorse the use of graph theory to solve
       # all possible problems.
       #
@@ -51,10 +63,21 @@ module Facter
         alias tsort_each_node each_key
 
         def tsort_each_child(node)
-          fetch(node).each do |child|
+          fetch(node).deps.each do |child|
             yield child
           end
         end
+      end
+
+      class Action
+
+        def initialize(name, deps, block)
+          @name = name
+          @deps = deps || []
+          @block = block
+        end
+
+        attr_accessor :name, :deps, :block
       end
     end
   end

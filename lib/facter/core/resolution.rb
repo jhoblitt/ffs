@@ -5,12 +5,18 @@ module Facter
     class Resolution
 
       attr_reader :name
+      attr_reader :deps
 
-      def initialize(fact, name)
+      def initialize(fact, name, opts = {})
         @fact = fact
         @name = name
 
         @confines = []
+
+        @opts = opts
+        @deps = opts[:using] || []
+
+        @block = nil
       end
 
       def clear
@@ -27,8 +33,14 @@ module Facter
         true
       end
 
+      def resolve(&block)
+        @block = block
+      end
+
       def value
-        raise NotImplementedError
+        sorted_resolutions.inject(nil) do |accum, res|
+          res.block.call(accum)
+        end
       end
 
       include Comparable
@@ -39,6 +51,29 @@ module Facter
 
       def weight
         @confines.length
+      end
+
+      def block
+        @block
+      end
+      protected :block
+
+      def depgraph
+        graph = Graph.new
+
+        graph[@name] = @deps
+
+        @deps.each do |depname|
+          dep = @fact.resolution(depname)
+          graph[depname] = dep.deps
+        end
+
+        puts graph.keys
+        graph
+      end
+
+      def sorted_resolutions
+        depgraph.tsort.map { |depname| @fact.resolution(depname) }
       end
 
       # Here at Puppet Labs, we fully endorse the use of graph theory to solve

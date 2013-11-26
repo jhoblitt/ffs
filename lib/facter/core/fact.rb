@@ -14,11 +14,11 @@ module Facter
 
       attr_reader :resolutions
 
-      def resolution(name, &block)
+      def resolution(name, opts = {}, &block)
         res = @resolutions.find { |res| res.name == name }
 
         if res.nil?
-          res = Facter::Core::Resolution.new(self, name)
+          res = Facter::Core::Resolution.new(self, name, opts)
           @resolutions << res
         end
 
